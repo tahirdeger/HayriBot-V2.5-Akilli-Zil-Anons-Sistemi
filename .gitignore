@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual Environment
+venv/
+env/
+
+# Build & Distribution
+dist/
+build/
+*.spec
+
+# Logs & Runtime
+*.log
+app.lock
+.install_info
+.last_report
+
+# Data & Cache
+*.sqlite
+data/tts_cache/
