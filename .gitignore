@@ -1,0 +1,45 @@
+# Sanal ortam
+.venv/
+venv/
+
+# Python önbellek
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# PyInstaller çıktıları
+build/
+dist/
+
+# Veritabanı — Telegram token ve kullanıcı verisi içerir
+data/*.sqlite
+data/*.db
+data/tts_cache/
+
+# Büyük binary model dosyaları (ayrıca indirilmeli)
+models/*.onnx
+models/piper/
+
+# Sistem DLL'leri (kurulum ile gelir)
+dlls/
+
+# Log dosyaları
+*.log
+launcher.log
+error.log
+
+# Geçici / kilit dosyaları
+app.lock
+*.tmp
+
+# IDE
+.vscode/
+.idea/
+
+# CONF klasörü (sadece proje notları)
+CONF/
+
+# Eski yedek dosyalar
+utils/app.py
+pdf_hazirla.py

@@ -1,0 +1,25 @@
+# --- Arayüz (GUI) ---
+customtkinter
+Pystray
+Pillow
+
+# --- Sistem ve Dosya Yönetimi ---
+psutil
+filelock
+pywin32
+
+# --- Zaman ve Olay Yönetimi ---
+APScheduler
+pymitter
+pytz
+tzdata
+
+# --- Ses ve Medya ---
+python-vlc
+piper-tts
+onnxruntime
+
+# --- Ağ ve Telegram ---
+requests
+aiohttp
+python-telegram-bot
