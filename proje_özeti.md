@@ -6,17 +6,18 @@ Bu belge, HayriBot projesinin mimarisini, bileşenlerini ve uygulanan kritik kar
 
 ## 🏗️ Sistem Mimarisi
 
-Proje, **Python** tabanlı, **Tkinter** arayüzlü, **Telegram** entegrasyonlu ve **Yapay Zeka (TTS)** destekli bir okul otomasyon sistemidir. Sistem, çökme korumalı (Watchdog) bir yapı üzerinde çalışır.
+Proje, **Python** tabanlı, **Tkinter** arayüzlü, **Telegram** entegrasyonlu ve **Yapay Zeka (TTS)** destekli bir okul otomasyon sistemidir.
 
 ### 🔄 Çalışma Döngüsü
-1.  **Launcher (`launcher.py`):** Bekçi görevi görür. `main.py`'yi başlatır ve izler. Çökme durumunda yeniden başlatır.
-2.  **Main (`main.py`):** Uygulamanın giriş noktasıdır.
-    *   Kilit dosyası (`app.lock`) kontrolü ve temizliği yapar.
-    *   Veritabanını başlatır.
-    *   Telegram Botunu (`asyncio` thread) başlatır.
-    *   GUI'yi (`gui/app.py`) başlatır.
-3.  **GUI (`gui/app.py`):** Kullanıcı arayüzü. Olayları (Event) dinler ve `MediaManager`'ı yönetir.
-4.  **Medya Yöneticisi (`config/settings.py`):** Ses çalma işlemlerinin merkezi. VLC kütüphanesini kullanır.
+
+1. **Main (`main.py`):** Uygulamanın tek giriş noktası.
+   - Kilit dosyası (`app.lock`) kontrolü ve temizliği yapar.
+   - Veritabanını başlatır.
+   - Zamanlayıcıyı Telegram'dan **bağımsız** başlatır (bot token olmasa da ziller çalar).
+   - Telegram Botunu (`asyncio` thread) başlatır.
+   - GUI'yi (`gui/app.py`) başlatır.
+2. **GUI (`gui/app.py`):** Kullanıcı arayüzü. Olayları (Event) dinler ve `MediaManager`'ı yönetir.
+3. **Medya Yöneticisi (`config/settings.py`):** Ses çalma işlemlerinin merkezi. VLC kütüphanesini kullanır.
 
 ---
 
@@ -24,71 +25,85 @@ Proje, **Python** tabanlı, **Tkinter** arayüzlü, **Telegram** entegrasyonlu v
 
 | Dosya | Görev |
 | :--- | :--- |
-| **`main.py`** | Başlatıcı, Loglama, Kilit Temizliği, Bot ve GUI Thread Yönetimi. |
-| **`gui/app.py`** | Tkinter Arayüzü, Butonlar, Liste Yönetimi, Başlangıç Isıtma (Warmup). |
+| **`main.py`** | Başlatıcı, Loglama, Kilit Temizliği, Zamanlayıcı, Bot ve GUI Thread Yönetimi. |
+| **`gui/app.py`** | Tkinter Arayüzü, 14×3 Zil Grid, TTS Durum Etiketi, Başlangıç Isıtma. |
 | **`config/settings.py`** | **`MediaManager` Sınıfı.** VLC Instance yönetimi, Ses çalma/durdurma, Meşguliyet kontrolü. |
-| **`utils/tts_manager.py`** | **Piper TTS** entegrasyonu. Metni sese çevirir. Gecikmeli yükleme (Lazy Loading) yapar. |
+| **`utils/tts_manager.py`** | **Piper TTS** entegrasyonu. Türkçe metin önişleme (sayı→kelime), gecikmeli yükleme. |
 | **`handlers/command_handlers.py`** | Telegram komutları (`/start`, `/volume`, `/pckapat` vb.) ve mesaj işleme. |
 | **`utils/scheduler.py`** | APScheduler ile zil saatlerini planlar ve tetikler. |
-| **`utils/event_emitter.py`** | Bileşenler arası (Bot <-> GUI <-> Media) haberleşmeyi sağlayan olay veriyolu. |
+| **`utils/event_emitter.py`** | Bileşenler arası (Bot ↔ GUI ↔ Media) haberleşmeyi sağlayan olay veriyolu. |
 
 ---
 
 ## 🛠️ Uygulanan Kritik Yamalar ve Çözümler
 
-Proje geliştirme sürecinde karşılaşılan hatalar ve uygulanan kalıcı çözümler:
-
 ### 1. Ses Sistemi Çökmesi (Access Violation 0xC0000005)
-*   **Sorun:** VLC `MediaPlayer` nesnelerinin sürekli oluşturulup silinmesi bellek hatasına yol açıyordu.
-*   **Çözüm (`config/settings.py`):** `vlc.Instance` tek bir kez oluşturulup (`self.vlc_instance`) tüm uygulama boyunca saklandı. Player'lar bu ortak instance üzerinden türetildi.
+- **Sorun:** VLC `MediaPlayer` nesnelerinin sürekli oluşturulup silinmesi bellek hatasına yol açıyordu.
+- **Çözüm:** `vlc.Instance` tek bir kez oluşturulup (`self.vlc_instance`) tüm uygulama boyunca saklandı.
 
-### 2. Başlangıçta Kilitlenme ve "Meşguliyet" Hatası
-*   **Sorun:** Windows açılışında ses kartı hazır olmadan ses çalmaya çalışılması sistemi "Meşgul" modunda kilitliyordu.
-*   **Çözüm 1 (`gui/app.py`):** `_warmup_audio_system` fonksiyonu eklendi. Açılıştan 5 saniye sonra çalışarak ses motorunu yeniliyor ve sessiz bir `startup.wav` çalarak sistemi tetikliyor.
-*   **Çözüm 2 (`config/settings.py`):** `play_media` fonksiyonuna "Yalancı Meşguliyet" koruması eklendi. Eğer sistem meşgul görünüyor ama ses çalmıyorsa, durum otomatik düzeltiliyor.
+### 2. Zamanlayıcı Telegram'a Bağımlıydı
+- **Sorun:** Bot token yoksa veya internet kesilmişse ziller hiç çalmıyordu.
+- **Çözüm (`main.py`):** `baslat_zamanlayici()` coroutine'i `start_telegram_bot_async()`'dan önce çalışacak şekilde ayrıldı.
 
-### 3. Kilit Dosyası (Lock File) Sorunu
-*   **Sorun:** Elektrik kesintisi veya zorla kapanma sonrası `app.lock` silinmediği için uygulama "Zaten çalışıyor" diyerek açılmıyordu.
-*   **Çözüm (`main.py`):** `cleanup_stale_locks` fonksiyonu geliştirildi. Bilgisayarın açılış saati (`boot_time`) kontrol edilerek, eski oturumdan kalan kilit dosyaları başlangıçta otomatik siliniyor.
+### 3. VLC Başlatma Bloğu
+- **Sorun:** `time.sleep(1.0)` her zil çalmada 1 saniyelik thread bloğuna yol açıyordu.
+- **Çözüm (`config/settings.py`):** Sleep yerine VLC state polling döngüsü eklendi.
 
-### 4. Arayüz Donması (TTS İşlemleri)
-*   **Sorun:** Ağır TTS modelleri yüklenirken arayüz donuyordu.
-*   **Çözüm (`utils/tts_manager.py`):** Model yükleme işlemi `_delayed_startup` ile ayrı bir thread'e alındı ve açılıştan 15 saniye sonraya ertelendi.
+### 4. PyInstaller `_internal` Dizin Sorunu
+- **Sorun:** PyInstaller 6.x her şeyi `_internal/` altına koyar; `path_resolver.py` EXE yanında arar.
+- **Çözüm (`HayriBot.spec`):** `contents_directory='.'` ile `_internal` kaldırıldı, tüm dosyalar EXE yanına çıktı.
 
-### 5. Telegram ve GUI Senkronizasyonu
-*   **Sorun:** Telegram'dan zil çalınca GUI'deki butonlar aktif kalıyordu (veya tam tersi).
-*   **Çözüm:** `EventEmitter` yapısı güçlendirildi. `media_status_changed`, `stop_all_media` gibi olaylarla her iki tarafın durumu anlık eşitleniyor.
+### 5. TTS Model Anahtarı Uyumsuzluğu
+- **Sorun:** DB'de `"male"/"female"` tutulurken UI `"ERKEK-Fahrettin"` gösteriyor; model yüklenemiyordu.
+- **Çözüm (`tts_manager.py`):** `load_model()` başında normalize dict eklendi.
+
+### 6. TTS Yüklenme Bildirimi Yoktu
+- **Sorun:** Kullanıcı model yüklenmeden anons butonuna basıyor, sessiz hata alıyordu.
+- **Çözüm (`gui/app.py`):** `_poll_tts_status()` ile Duyuru paneline durum etiketi eklendi; yüklenene kadar buton devre dışı.
+
+---
+
+## 🆕 V2.5 Yeni Özellikler
+
+### 14×3 Inline Zil Grid
+Eski dialog/tablo sistemi kaldırıldı. Sağ panele doğrudan 14 satır × 3 sütun (Öğrenci / Öğretmen / Teneffüs) grid yerleştirildi. Kullanıcı saatleri yazıp **Kaydet** der, sistem tümünü siler ve yeniden yükler.
+
+### Türkçe Metin Önişlemcisi
+`tts_manager._preprocess()` ile senteze girmeden:
+- Saat formatı: `08:30` → "sekiz otuz"
+- Sayılar (0–999): `"15 dakika"` → `"on beş dakika"`
+- Çoklu boşluk/nokta temizlenir
 
 ---
 
 ## ⚙️ Teknik Özellikler
 
-*   **Dil:** Python 3.10+
-*   **GUI:** Tkinter (Standart kütüphane)
-*   **Ses Motoru:** `python-vlc` (VLC Media Player DLL'leri gerektirir)
-*   **TTS Motoru:** `piper-tts` (ONNX tabanlı, çevrimdışı, Türkçe Fahrettin modeli)
-*   **Veritabanı:** SQLite (`data/zil_db.sqlite`)
-*   **Zamanlayıcı:** `APScheduler` (BackgroundScheduler)
-*   **Bot Kütüphanesi:** `python-telegram-bot` (Async)
-*   **Exe Derleme:** `PyInstaller` (Tek klasör modu)
+| Bileşen | Teknoloji |
+| :--- | :--- |
+| Dil | Python 3.11 |
+| GUI | Tkinter + ttk |
+| Ses Motoru | `python-vlc` |
+| TTS | `piper-tts` (ONNX, çevrimdışı, Fahrettin medium) |
+| Veritabanı | SQLite (`data/zil_db.sqlite`) |
+| Zamanlayıcı | `APScheduler` BackgroundScheduler |
+| Bot | `python-telegram-bot` (Async) |
+| Derleme | `PyInstaller 6.x` (`contents_directory='.'`) |
 
 ---
 
 ## 📝 Geliştirici Notları
 
-1.  **Derleme (Build):**
-    Değişiklik yapıldığında `dist` klasörü silinmeli ve şu komut çalıştırılmalıdır:
-    ```bash
-    pyinstaller --clean --noconfirm HayriBot.spec
-    ```
+**Derleme:**
+```bash
+pyinstaller HayriBot.spec --clean --noconfirm
+```
 
-2.  **Ses Dosyaları:**
-    `media/` klasöründeki dosya isimleri (`zil.mp3`, `tam.mp3` vb.) kod içinde sabittir (`config/settings.py`). Dosya değiştirilirken isimler korunmalıdır.
+**Ses Dosyaları:** `media/` klasöründeki dosya isimleri kod içinde sabittir. Değiştirirken isimler korunmalıdır.
 
-3.  **Git Yönetimi:**
-    Hassas veriler (`zil_db.sqlite`, `app.log`) `.gitignore` ile hariç tutulmuştur.
+**TTS Modelleri:** `models/` klasörüne `tr_TR-fahrettin-medium.onnx` ve `.onnx.json` dosyaları elle kopyalanmalıdır (.gitignore ile hariç tutulmuştur).
+
+**Git:** Hassas veriler (`zil_db.sqlite`, `*.log`, `dlls/`, `models/*.onnx`) `.gitignore` ile hariç tutulmuştur.
 
 ---
 
-*Bu belge, HayriBot V2.5 sürümü için oluşturulmuştur.*
-```
+*Geliştirici: Tahir Değer | [zamanmakinesi.xyz](https://zamanmakinesi.xyz)*

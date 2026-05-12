@@ -19,6 +19,7 @@ data/tts_cache/
 
 # Büyük binary model dosyaları (ayrıca indirilmeli)
 models/*.onnx
+models/*.ort
 models/piper/
 
 # Sistem DLL'leri (kurulum ile gelir)
@@ -31,6 +32,7 @@ error.log
 
 # Geçici / kilit dosyaları
 app.lock
+app.lock.lock
 *.tmp
 
 # IDE
@@ -43,3 +45,4 @@ CONF/
 # Eski yedek dosyalar
 utils/app.py
 pdf_hazirla.py
+launcher.py
