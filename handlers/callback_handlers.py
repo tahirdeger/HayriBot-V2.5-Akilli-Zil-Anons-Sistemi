@@ -142,12 +142,8 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     query = update.callback_query
     
-    # 1. HIZLI İNTERNET KONTROLÜ
-    if not await check_internet():
-        await query.answer("🌐 İnternet bağlantısı yok!", show_alert=True)
-        return
-
-    # 2. YETKİ KONTROLÜ (CANLI KONTROL)
+    # 1. YETKİ KONTROLÜ (CANLI KONTROL)
+    # Not: Telegram'dan callback geldiyse internet zaten çalışıyor — ayrı kontrol gereksiz.
     user_id = str(query.from_user.id)
     raw_ids = ayar_getir("allowed_user_ids")
     allowed_ids = [id.strip() for id in raw_ids.split(",") if id.strip()] if raw_ids else []
