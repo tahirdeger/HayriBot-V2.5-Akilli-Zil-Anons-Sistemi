@@ -70,6 +70,17 @@ def check_db_schema():
                     )
                     logging.info(f"Varsayılan ayar eklendi: {anahtar}={deger}")
             conn.commit()
+
+            # Yanlış kaydedilmiş tts_speed değerini düzelt (< 0.8 → 1.0)
+            try:
+                row = conn.execute("SELECT deger FROM ayarlar WHERE anahtar='tts_speed'").fetchone()
+                if row and float(row[0]) < 0.8:
+                    conn.execute("UPDATE ayarlar SET deger='1.0' WHERE anahtar='tts_speed'")
+                    conn.commit()
+                    logging.info("tts_speed düzeltildi: 1.0")
+            except Exception:
+                pass
+
     except sqlite3.Error as e:
         logging.error(f"Şema kontrol hatası: {str(e)}", exc_info=True)
         raise

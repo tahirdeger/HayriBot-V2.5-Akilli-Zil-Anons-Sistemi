@@ -23,7 +23,8 @@ class PiperTTSManager:
         
         self.voice = None
         self.is_loaded = False
-        self.current_model_type = None 
+        self._failed = False          # Gerçek hata durumu — yükleniyor ≠ başarısız
+        self.current_model_type = None
         
         os.makedirs(self.cache_dir, exist_ok=True)
         
@@ -95,6 +96,8 @@ class PiperTTSManager:
         except Exception as e:
             logging.error(f"Model yükleme hatası: {str(e)}")
             self.is_loaded = False
+            self._failed = True
+            ee.emit("tts_failed")
             return False
 
     def reload_model(self):
@@ -106,7 +109,7 @@ class PiperTTSManager:
         return self.is_loaded
 
     def has_failed(self):
-        return not self.is_loaded
+        return self._failed
 
     _ONES = ["", "bir", "iki", "üç", "dört", "beş", "altı", "yedi", "sekiz", "dokuz"]
     _TENS = ["", "on", "yirmi", "otuz", "kırk", "elli", "altmış", "yetmiş", "seksen", "doksan"]

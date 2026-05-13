@@ -92,7 +92,7 @@ class ChatCleanupManager:
             menu_text = (
                 "🔔 HayriBotV2.5\n"
                 "🏫 Zil ve Duyuru Sistemi\n"
-                "islematolyesi.odoo.com | 2025\n"
+                "zamanmakinesi.xyz | 2025\n"
                 "\n🔄 Otomatik temizlik yapıldı. Menü yenilendi."
             )
             try:

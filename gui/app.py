@@ -1254,7 +1254,7 @@ class ZilYonetimGUI:
         # Tıklanabilir bağlantı
         link_label = ttk.Label(
             footer_frame,
-            text="HayriBotV2 | 2025 | islematolyesi.odoo.com",
+            text="HayriBotV2 | 2025 | zamanmakinesi.xyz",
             font=("Segoe UI", 9, "italic", "underline"),
             foreground="#0000FF",
             cursor="hand2",
@@ -2507,8 +2507,13 @@ class ZilYonetimGUI:
             basarili = sum(1 for s, t, j in valid if ekle_zil(s, t, j))
             from utils.scheduler import refresh_scheduler
             refresh_scheduler()
-            self._update_status_with_style(f"✅ {basarili} zil saati kaydedildi", "normal")
             logging.info(f"Grid kaydedildi: {basarili}/{len(valid)} saat")
+            self._update_status_with_style(f"✅ {basarili} zil saati kaydedildi", "normal")
+            messagebox.showinfo(
+                "Kaydedildi",
+                f"✅ {basarili} zil saati başarıyla kaydedildi\n"
+                f"(Öğrenci / Öğretmen / Teneffüs dahil)"
+            )
         except Exception as exc:
             logging.error(f"Grid kaydetme hatası: {exc}", exc_info=True)
             messagebox.showerror("Hata", f"Kaydetme hatası: {exc}")
