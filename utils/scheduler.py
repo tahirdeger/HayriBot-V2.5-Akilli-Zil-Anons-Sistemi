@@ -87,16 +87,15 @@ async def baslat_zamanlayici(application=None):
         logging.error(f"❌ Zamanlayıcı başlatma hatası: {str(e)}", exc_info=True)
         raise
 
-def register_events():
-    logging.info("register_events fonksiyonu çağrıldı")
+_events_registered = False
 
-    # Ana event loop'u global olarak sakla
-    try:
-        main_loop = asyncio.get_event_loop()
-    except RuntimeError:
-        main_loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(main_loop)
-        logging.debug("Yeni asyncio event loop oluşturuldu")
+def register_events():
+    global _events_registered
+    if _events_registered:
+        logging.debug("register_events zaten çağrıldı, atlanıyor")
+        return
+    _events_registered = True
+    logging.info("register_events fonksiyonu çağrıldı")
 
     @ee.on("veri_degisti")
     def handle_veri_degisti():
@@ -129,16 +128,16 @@ def register_events():
 def refresh_scheduler():
     try:
         logging.info("🔄 Zamanlayıcı yenileniyor...")
-        
-        # Sadece zil joblarını temizle (varsa temizlik görevi kalsın)
-        jobs = scheduler.get_jobs()
-        for job in jobs:
-            if job.id != 'gunluk_temizlik':
-                job.remove()
-        
+
+        # Önce DB'den oku — hata atarsa mevcut job'lara dokunulmaz
         from utils.database import listele_zil
         ziller = listele_zil()
-        
+
+        # DB başarıyla okunduysa eski zil job'larını temizle
+        for job in scheduler.get_jobs():
+            if job.id != 'gunluk_temizlik':
+                job.remove()
+
         for zil in ziller:
             zil_id, saat, tur, job_id = zil
             try:

@@ -292,7 +292,6 @@ async def start_telegram_bot_async():
         )
         # ------------------------
         
-        await baslat_zamanlayici(app)
         set_current_bot_application(app)
         
         asyncio.create_task(send_startup_notification(app))
