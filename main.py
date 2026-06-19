@@ -1,4 +1,4 @@
-﻿# ============================================
+# ============================================
 # HAYRİBOT V1.6 - ANA UYGULAMA 
 # ============================================
 
@@ -366,6 +366,13 @@ def main():
     init_db()
     
     loop = asyncio.new_event_loop()
+
+    # Event dinleyicisi tanımla
+    def on_restart_bot():
+        logging.info("event emitter: restart_bot sinyali alındı, bot yeniden başlatılıyor...")
+        asyncio.run_coroutine_threadsafe(handle_restart_bot(), loop)
+    from utils.event_emitter import ee
+    ee.on("restart_bot", on_restart_bot)
 
     async_thread = threading.Thread(target=start_async_tasks, args=(loop,), daemon=True)
     async_thread.start()

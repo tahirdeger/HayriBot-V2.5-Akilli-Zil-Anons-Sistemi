@@ -34,19 +34,18 @@ async def check_internet_background():
             
             current_status = await check_internet()
             
-            # Eğer durum değiştiyse sadece bilgi ver
+            # Eğer durum değiştiyse işlem yap
             if current_status != last_status:
-                
                 status_text = "🌐 Bağlantı sağlandı" if current_status else "❌ İnternet bağlantısı koptu"
                 logging.info(status_text)
                 
                 # GUI ikonları için sinyal gönder (Sadece görsel güncelleme)
                 ee.emit("internet_status_changed", current_status)
                 
-                # ÖNEMLİ DEĞİŞİKLİK:
-                # restart_bot sinyalini KALDIRDIK. 
-                # Telegram botu (Application) bağlantı koparsa kendisi retry yapar.
-                # Bizim dışarıdan müdahale etmemiz Conflict yaratıyor.
+                # İnternet geri geldiyse Telegram bağlantısını tazelemek için sinyal gönder
+                if current_status and last_status is False:
+                    logging.info("🌐 Bağlantı geri geldi, Telegram botu yeniden başlatılıyor...")
+                    ee.emit("restart_bot")
                 
                 last_status = current_status
             
