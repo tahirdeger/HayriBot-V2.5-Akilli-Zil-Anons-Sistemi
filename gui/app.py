@@ -1557,9 +1557,18 @@ class ZilYonetimGUI:
                 raise Exception("Tekrar anonsu çalınamadı")
             
             # Tekrar anonsu boyunca iptal kontrolü
-            tekrar_path = os.path.join(MEDIA_DIR, "tekrar.wav")
+            current_model = ayar_getir("tts_model", "male")
+            _normalize = {"erkek-fahrettin": "male", "kadin(yakinda)": "female",
+                          "erkek": "male", "kadin": "female"}
+            normalized_model = _normalize.get(current_model.lower(), current_model.lower())
+            
+            tekrar_file = "tekrar1.wav" if normalized_model == "male" else "tekrar2.wav"
+            tekrar_path = os.path.join(MEDIA_DIR, tekrar_file)
+            if not os.path.exists(tekrar_path):
+                tekrar_path = os.path.join(MEDIA_DIR, "tekrar.wav")
+                
             tekrar_duration = get_duration(tekrar_path)
-            logging.info(f"Tekrar süresi: {tekrar_duration}s")
+            logging.info(f"Tekrar anonsu dosyası: {os.path.basename(tekrar_path)}, Süresi: {tekrar_duration}s")
             
             tekrar_start = time.time()
             while (time.time() - tekrar_start) < (tekrar_duration + 0.5):

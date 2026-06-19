@@ -255,6 +255,28 @@ class MediaManager:
         Medya çal - TELEGRAM-GUI SENKRONİZASYONLU GÜNCELLEME
         """
         try:
+            # Tekrar sesi için model seçimine göre dinamik dosya belirleme
+            if name == 'tekrar':
+                try:
+                    from utils.database import ayar_getir
+                    current_model = ayar_getir("tts_model", "male")
+                    # Geriye dönük uyumlu model isim normalizasyonu
+                    _normalize = {"erkek-fahrettin": "male", "kadin(yakinda)": "female",
+                                  "erkek": "male", "kadin": "female"}
+                    normalized_model = _normalize.get(current_model.lower(), current_model.lower())
+                    
+                    tekrar_file = "tekrar1.wav" if normalized_model == "male" else "tekrar2.wav"
+                    tekrar_path = self.MEDIA_DIR / tekrar_file
+                    
+                    if tekrar_path.exists():
+                        self.players['tekrar']['path'] = str(tekrar_path)
+                        logging.info(f"🔊 Dinamik tekrar sesi seçildi: {tekrar_file}")
+                    else:
+                        self.players['tekrar']['path'] = str(self.MEDIA_DIR / "tekrar.wav")
+                        logging.warning(f"⚠️ {tekrar_file} bulunamadı, varsayılan tekrar.wav kullanılıyor.")
+                except Exception as ex:
+                    logging.error(f"Dinamik tekrar sesi seçimi hatası: {ex}")
+            
             # ⚠️ KORUMA: Kilitli kalmış meşguliyet durumunu düzelt
             if self.is_busy and not self.is_playing:
                 logging.warning("⚠️ Tespit edilen kilitli meşguliyet durumu düzeltiliyor...")
