@@ -24,10 +24,6 @@ a = Analysis(
         ('dlls\\libvlc.dll',         '.'),
         ('dlls\\libvlccore.dll',     '.'),
         ('dlls\\npvlc.dll',          '.'),
-        ('dlls\\freetype.dll',       '.'),
-        ('dlls\\libiomp5md.dll',     '.'),
-        ('dlls\\libjpeg-62.dll',     '.'),
-        ('dlls\\libpng16-16.dll',    '.'),
         ('dlls\\zlib1.dll',          '.'),
         # sqlite3.dll — _sqlite3.pyd'nin bağımlılığı
         ('dlls\\sqlite3.dll',        '.'),

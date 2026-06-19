@@ -177,9 +177,6 @@ class PiperTTSManager:
         output_path = os.path.join(self.cache_dir, output_filename)
         
         try:
-            text = self._preprocess(text)
-            logging.debug(f"TTS önişlenmiş metin: {text}")
-
             # --- HIZ AYARI ---
             try:
                 user_speed = float(ayar_getir("tts_speed", "1.0"))
@@ -202,8 +199,11 @@ class PiperTTSManager:
                     
                     q = queue.Queue()
                     
+                    # Edge-TTS için metni doğal bırakıyoruz (sadece temizlik)
+                    clean_text = text.strip()
+                    
                     async def run_edge_tts():
-                        communicate = edge_tts.Communicate(text, voice_name, rate=rate_str)
+                        communicate = edge_tts.Communicate(clean_text, voice_name, rate=rate_str)
                         await communicate.save(output_path)
                         
                     def worker():
@@ -236,6 +236,9 @@ class PiperTTSManager:
 
             # --- OFFLINE FALLBACK (Piper) ---
             logging.info("📴 Offline TTS (Piper) kullanılıyor...")
+            processed_text = self._preprocess(text)
+            logging.debug(f"TTS Piper önişlenmiş metin: {processed_text}")
+            
             if not self.is_loaded:
                 target = ayar_getir("tts_model", "male")
                 if not self.load_model(target):
@@ -258,7 +261,7 @@ class PiperTTSManager:
                 wav_file.setframerate(self.voice.config.sample_rate)
                 
                 # Sentezlemeyi başlat
-                stream = self.voice.synthesize(text)
+                stream = self.voice.synthesize(processed_text)
                 
                 chunks_written = 0
                 
