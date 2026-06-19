@@ -37,6 +37,7 @@ a = Analysis(
         'piper',
         'onnxruntime',
         'onnxruntime.capi._pybind_state',
+        'edge_tts',
         'vlc',
         'apscheduler.schedulers.background',
         'apscheduler.executors.pool',

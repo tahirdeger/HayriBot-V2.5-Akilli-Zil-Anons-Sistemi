@@ -4,6 +4,7 @@ import time
 import wave
 import sys
 import threading
+import asyncio
 
 try:
     from piper import PiperVoice
@@ -20,6 +21,7 @@ class PiperTTSManager:
     def __init__(self):
         self.use_cuda = False
         self.cache_dir = get_data_path("tts_cache")
+        self.online_status = False
         
         self.voice = None
         self.is_loaded = False
@@ -33,8 +35,9 @@ class PiperTTSManager:
         # Başlangıçta sistemi kilitlememek için thread içinde gecikmeli başlat
         threading.Thread(target=self._delayed_startup, args=(preferred_model,), daemon=True).start()
 
-        # Event dinleyici
+        # Event dinleyiciler
         ee.on("tts_settings_changed", self.reload_model)
+        ee.on("internet_status_changed", self._set_online_status)
 
     def _delayed_startup(self, model_type):
         """Başlangıçta sistemi kilitlememek için gecikmeli yükleme"""
@@ -105,7 +108,25 @@ class PiperTTSManager:
         if target_model != self.current_model_type:
             self.load_model(target_model)
 
+    def _set_online_status(self, is_connected):
+        self.online_status = is_connected
+        logging.info(f"🌐 TTS Manager internet durumu güncellendi: {'Online' if is_connected else 'Offline'}")
+
+    def is_online(self):
+        if self.online_status:
+            return True
+        try:
+            import urllib.request
+            urllib.request.urlopen("http://clients3.google.com/generate_204", timeout=1.5)
+            self.online_status = True
+            return True
+        except:
+            self.online_status = False
+            return False
+
     def is_ready(self):
+        if self.is_online():
+            return True
         return self.is_loaded
 
     def has_failed(self):
@@ -153,25 +174,76 @@ class PiperTTSManager:
         return text.strip()
 
     def synthesize_speech(self, text, output_filename="tts_temp.wav"):
-        if not self.is_loaded:
-            target = ayar_getir("tts_model", "male")
-            if not self.load_model(target):
-                return None
-
+        output_path = os.path.join(self.cache_dir, output_filename)
+        
         try:
             text = self._preprocess(text)
             logging.debug(f"TTS önişlenmiş metin: {text}")
-
-            output_path = os.path.join(self.cache_dir, output_filename)
-            start_time = time.time()
 
             # --- HIZ AYARI ---
             try:
                 user_speed = float(ayar_getir("tts_speed", "1.0"))
                 if user_speed <= 0: user_speed = 1.0
-                length_scale = 1.0 / user_speed
             except:
-                length_scale = 1.0
+                user_speed = 1.0
+
+            # --- ONLINE DENE (Edge-TTS) ---
+            if self.is_online():
+                try:
+                    logging.info("🌐 Online TTS (Edge-TTS) kullanılıyor...")
+                    db_voice = ayar_getir("tts_model", "male")
+                    voice_name = "tr-TR-AhmetNeural" if db_voice == "male" else "tr-TR-EmelNeural"
+                    
+                    rate_percent = int((user_speed - 1.0) * 100)
+                    rate_str = f"{rate_percent:+d}%" if rate_percent != 0 else "+0%"
+                    
+                    import edge_tts
+                    import queue
+                    
+                    q = queue.Queue()
+                    
+                    async def run_edge_tts():
+                        communicate = edge_tts.Communicate(text, voice_name, rate=rate_str)
+                        await communicate.save(output_path)
+                        
+                    def worker():
+                        try:
+                            loop = asyncio.new_event_loop()
+                            asyncio.set_event_loop(loop)
+                            loop.run_until_complete(run_edge_tts())
+                            loop.close()
+                            q.put((True, None))
+                        except Exception as e:
+                            q.put((False, e))
+                            
+                    start_time = time.time()
+                    t = threading.Thread(target=worker, daemon=True)
+                    t.start()
+                    t.join(timeout=15.0) # 15s zaman aşımı
+                    
+                    if t.is_alive():
+                        logging.error("❌ Online TTS zaman aşımına uğradı, Piper'a geçiliyor...")
+                    else:
+                        success, err = q.get_nowait()
+                        if success and os.path.exists(output_path) and os.path.getsize(output_path) > 44:
+                            elapsed = time.time() - start_time
+                            logging.info(f"✅ Online ses üretildi ({elapsed:.2f}s, Hız: {user_speed}x, Boyut: {os.path.getsize(output_path)})")
+                            return output_path
+                        else:
+                            logging.error(f"❌ Online TTS hatası veya boş dosya: {err}. Piper'a geçiliyor...")
+                except Exception as e:
+                    logging.error(f"❌ Online TTS genel hatası: {e}. Piper'a geçiliyor...")
+
+            # --- OFFLINE FALLBACK (Piper) ---
+            logging.info("📴 Offline TTS (Piper) kullanılıyor...")
+            if not self.is_loaded:
+                target = ayar_getir("tts_model", "male")
+                if not self.load_model(target):
+                    logging.error("❌ Offline Piper model yüklenemedi!")
+                    return None
+
+            start_time = time.time()
+            length_scale = 1.0 / user_speed
 
             # Config ayarla
             if hasattr(self.voice, 'config'):
@@ -198,7 +270,6 @@ class PiperTTSManager:
                         continue
                     
                     # 2. Nesne ise, içindeki tüm özellikleri tara ve bytes olanı bul
-                    # Bu yöntem nesne yapısı ne olursa olsun (audio, bytes, data, raw vs.) çalışır.
                     data_found = False
                     for attr_name in dir(chunk):
                         if attr_name.startswith('_'): continue # Gizli özellikleri geç
@@ -220,7 +291,7 @@ class PiperTTSManager:
 
             elapsed = time.time() - start_time
             file_size = os.path.getsize(output_path)
-            logging.info(f"Ses üretildi ({elapsed:.2f}s, Hız: {user_speed}x, Boyut: {file_size}, Paketler: {chunks_written}): {output_path}")
+            logging.info(f"✅ Offline ses üretildi ({elapsed:.2f}s, Hız: {user_speed}x, Boyut: {file_size}, Paketler: {chunks_written})")
             
             # WAV header 44 byte'tır. Dosya bundan büyükse ses verisi var demektir.
             if file_size > 44:

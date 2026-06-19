@@ -4,13 +4,13 @@ import logging
 from utils.event_emitter import ee
 
 async def check_internet():
-    # Cloudflare DNS - Güvenilir kontrol
-    url = "https://1.1.1.1" 
+    # Google connectivity check - Güvenilir ve SSL sertifika hatası üretmeyen hızlı kontrol
+    url = "http://clients3.google.com/generate_204" 
     try:
         # Timeout süresini artırdık (CPU yükü altında hata vermemesi için)
         async with aiohttp.ClientSession() as session:
             async with session.get(url, timeout=10) as response:
-                return response.status == 200
+                return response.status in (200, 204)
     except:
         return False
 
@@ -25,6 +25,7 @@ async def check_internet_background():
     # İlk açılışta durumu tespit et
     last_status = await check_internet()
     logging.info(f"İnternet izleme servisi aktif. Durum: {'Online' if last_status else 'Offline'}")
+    ee.emit("internet_status_changed", last_status)
     
     while True:
         try:

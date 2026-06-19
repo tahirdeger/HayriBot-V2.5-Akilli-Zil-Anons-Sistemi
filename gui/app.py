@@ -255,11 +255,11 @@ class AyarlarPaneli(tk.Toplevel):
         
         ttk.Label(frame_ses, text="🗣️ Seslendirmen:").pack(side=tk.LEFT)
         
-        _model_display = {"male": "ERKEK-Fahrettin", "female": "KADIN(Yakında)"}
+        _model_display = {"male": "ERKEK", "female": "KADIN"}
         _current_db_model = ayar_getir("tts_model", "male")
-        self.var_model = tk.StringVar(value=_model_display.get(_current_db_model, "ERKEK-Fahrettin"))
+        self.var_model = tk.StringVar(value=_model_display.get(_current_db_model, "ERKEK"))
         combo_model = ttk.Combobox(frame_ses, textvariable=self.var_model, state="readonly")
-        combo_model['values'] = ('ERKEK-Fahrettin', 'KADIN(Yakında)')
+        combo_model['values'] = ('ERKEK', 'KADIN')
         combo_model.pack(side=tk.RIGHT, expand=True, fill=tk.X, padx=(10,0))
         
         # B) Hız Ayarı
@@ -343,7 +343,7 @@ class AyarlarPaneli(tk.Toplevel):
             old_school_type = ayar_getir("school_type", "normal")
             
             # 2. TTS Ayarları — UI adını DB anahtarına çevir
-            _model_to_key = {"ERKEK-Fahrettin": "male", "KADIN(Yakında)": "female"}
+            _model_to_key = {"ERKEK": "male", "KADIN": "female", "ERKEK-Fahrettin": "male", "KADIN(Yakında)": "female"}
             new_model_key = _model_to_key.get(self.var_model.get(), "male")
             new_speed = str(round(self.scale_hiz.get(), 1))
 
