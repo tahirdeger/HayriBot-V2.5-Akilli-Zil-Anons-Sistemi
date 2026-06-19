@@ -27,6 +27,7 @@ class PiperTTSManager:
         self.is_loaded = False
         self._failed = False          # Gerçek hata durumu — yükleniyor ≠ başarısız
         self.current_model_type = None
+        self.last_engine = None
         
         os.makedirs(self.cache_dir, exist_ok=True)
         
@@ -173,6 +174,49 @@ class PiperTTSManager:
         text = re.sub(r"\s+([.,!?])", r"\1", text)
         return text.strip()
 
+    def _synthesize_google_tts(self, text, output_path):
+        import urllib.request
+        import urllib.parse
+        import re
+        try:
+            logging.info("🌐 Google Translate TTS ile online ses üretimi deneniyor...")
+            raw_text = text.strip()
+            # Cümle veya makul uzunluktaki parçalara böl (max 150 karakter)
+            parts = re.split(r'(?<=[.!?])\s+', raw_text)
+            
+            chunks = []
+            current_chunk = ""
+            for part in parts:
+                if len(current_chunk) + len(part) + 1 < 150:
+                    current_chunk = f"{current_chunk} {part}".strip()
+                else:
+                    if current_chunk:
+                        chunks.append(current_chunk)
+                    current_chunk = part
+            if current_chunk:
+                chunks.append(current_chunk)
+                
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+            }
+            
+            combined_data = b""
+            for chunk in chunks:
+                if not chunk: continue
+                encoded_text = urllib.parse.quote(chunk)
+                url = f"https://translate.google.com/translate_tts?ie=UTF-8&q={encoded_text}&tl=tr&client=tw-ob"
+                req = urllib.request.Request(url, headers=headers)
+                with urllib.request.urlopen(req, timeout=5) as response:
+                    combined_data += response.read()
+            
+            if len(combined_data) > 100:
+                with open(output_path, "wb") as f:
+                    f.write(combined_data)
+                return True
+        except Exception as e:
+            logging.error(f"❌ Google Translate TTS hatası: {e}")
+        return False
+
     def synthesize_speech(self, text, output_filename="tts_temp.wav"):
         output_path = os.path.join(self.cache_dir, output_filename)
         
@@ -222,17 +266,33 @@ class PiperTTSManager:
                     t.join(timeout=15.0) # 15s zaman aşımı
                     
                     if t.is_alive():
-                        logging.error("❌ Online TTS zaman aşımına uğradı, Piper'a geçiliyor...")
+                        logging.error("❌ Online TTS zaman aşımına uğradı, Google veya Piper'a geçiliyor...")
                     else:
                         success, err = q.get_nowait()
                         if success and os.path.exists(output_path) and os.path.getsize(output_path) > 44:
                             elapsed = time.time() - start_time
                             logging.info(f"✅ Online ses üretildi ({elapsed:.2f}s, Hız: {user_speed}x, Boyut: {os.path.getsize(output_path)})")
+                            self.last_engine = "edge"
                             return output_path
                         else:
-                            logging.error(f"❌ Online TTS hatası veya boş dosya: {err}. Piper'a geçiliyor...")
+                            logging.error(f"❌ Online TTS hatası veya boş dosya: {err}. Google veya Piper'a geçiliyor...")
                 except Exception as e:
-                    logging.error(f"❌ Online TTS genel hatası: {e}. Piper'a geçiliyor...")
+                    logging.error(f"❌ Online TTS genel hatası: {e}. Google veya Piper'a geçiliyor...")
+
+            # --- GOOGLE TRANSLATE FALLBACK (For Female Voice under MEB IP) ---
+            db_voice = ayar_getir("tts_model", "male")
+            _normalize = {"erkek-fahrettin": "male", "kadin(yakinda)": "female",
+                          "erkek": "male", "kadin": "female"}
+            normalized_voice = _normalize.get(db_voice.lower(), db_voice.lower())
+
+            if self.is_online() and normalized_voice == "female":
+                try:
+                    if self._synthesize_google_tts(text, output_path):
+                        self.last_engine = "google"
+                        logging.info("✅ Google Translate TTS ile online kadın sesi üretildi.")
+                        return output_path
+                except Exception as e:
+                    logging.error(f"❌ Google Translate TTS fallback hatası: {e}")
 
             # --- OFFLINE FALLBACK (Piper) ---
             logging.info("📴 Offline TTS (Piper) kullanılıyor...")
@@ -298,6 +358,7 @@ class PiperTTSManager:
             
             # WAV header 44 byte'tır. Dosya bundan büyükse ses verisi var demektir.
             if file_size > 44:
+                self.last_engine = "piper"
                 return output_path
             else:
                 logging.error(f"❌ Ses dosyası boş (Boyut: {file_size}). Text: '{text}'")

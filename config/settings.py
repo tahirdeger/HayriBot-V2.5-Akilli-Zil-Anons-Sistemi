@@ -405,6 +405,19 @@ class MediaManager:
             # Volume ayarla
             player.audio_set_volume(int(self.global_volume * 100))
             
+            # Google Translate TTS için hız ayarı (VLC üzerinden)
+            if name == 'tts_temp':
+                try:
+                    from utils.tts_manager import tts_manager
+                    if getattr(tts_manager, 'last_engine', '') == 'google':
+                        from utils.database import ayar_getir
+                        speed = float(ayar_getir("tts_speed", "1.0"))
+                        if speed > 0 and speed != 1.0:
+                            player.set_rate(speed)
+                            logging.info(f"⚡ Google Translate TTS için VLC çalma hızı ayarlandı: {speed}x")
+                except Exception as es:
+                    logging.error(f"VLC hızı ayarlanırken hata: {es}")
+
             # Play et
             result = player.play()
             if result == -1:
